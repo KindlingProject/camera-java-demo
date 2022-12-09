@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stuck-demo
+  labels:
+    app: stuck-demo
+spec:
+  selector:
+    matchLabels:
+      octopusexport: OctopusExport
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: stuck-demo
+        octopusexport: OctopusExport
+    spec:
+      hostNetwork: true
+      containers:
+        - name: stuck-demo
+          image: '10.10.102.213:8443/cloudnevro-test/stuck-demo:latest'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 19999
+              protocol: TCP
+          env:
+            - name: TZ
+              value: Asia/Shanghai
+            - name: SERVER_PORT
+              value: '19999'
+            - name: SKYWALKING_LOGGING_LEVEL
+              value: INFO
+            - name: SKYWALKING_COLLECTOR_BACKEND_SERVICE
+              value: '10.10.103.148:11800'
+            - name: SKYWALKING_AGENT_SERVICE_NAME
+              value: stuck-demo
+          resources:
+            limits:
+              memory: 1Gi
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - worker-148
