@@ -19,7 +19,7 @@ public class IOController {
     private static Logger LOG = LogManager.getLogger(IOController.class);
     
     private Scanner scanner = new Scanner(System.in);
-    
+
     @ApiOperation(value = "等待输入")
     @RequestMapping(value = "/block", method = RequestMethod.GET)
     public Result block() throws Exception {

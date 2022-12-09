@@ -16,10 +16,10 @@ import com.zaxxer.hikari.HikariDataSource;
 @Component
 public class DataSourceConfig {
     private static Logger LOG = LogManager.getLogger(DataSourceConfig.class);
-    
+
     @Value("${datasource.driverClass}")
     private String driverClass;
-    
+
     @Value("${datasource.url}")
     private String jdbcUrl;
 
@@ -28,13 +28,13 @@ public class DataSourceConfig {
 
     @Value("${datasource.password}")
     private String password;
-    
+
     @Value("${datasource.minPool}")
     private int minPoolSize;
-    
+
     @Value("${datasource.maxPool}")
     private int maxPoolSize;
-    
+
     @Bean(name = "HikariCP")
     public DataSource getHikariCPDataSource() {
         try {
@@ -45,7 +45,7 @@ public class DataSourceConfig {
             config.setPassword(password);
             config.setMaximumPoolSize(maxPoolSize);
             config.setMinimumIdle(minPoolSize);
-            config.setConnectionTimeout(30000L);
+            config.setConnectionTimeout(3000L);
 //            config.setLeakDetectionThreshold(60000L);
             config.setPoolName("dataSource_Hikaricp");
             return new HikariDataSource(config);

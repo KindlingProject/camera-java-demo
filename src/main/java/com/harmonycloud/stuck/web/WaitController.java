@@ -1,8 +1,9 @@
 package com.harmonycloud.stuck.web;
 
-import java.io.IOException;
-import java.util.concurrent.locks.ReentrantLock;
-
+import com.harmonycloud.stuck.bean.Result;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiImplicitParam;
+import io.swagger.annotations.ApiOperation;
 import org.apache.http.HttpStatus;
 import org.apache.http.ParseException;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -12,17 +13,10 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
-import com.harmonycloud.stuck.bean.Result;
-
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiImplicitParam;
-import io.swagger.annotations.ApiOperation;
+import java.io.IOException;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Api(value = "请求长等待", tags = {"Wait"})
 @RestController
@@ -41,7 +35,7 @@ public class WaitController {
         LOG.info("Finsh Sleep");
         return Result.success("Sleep " + second + "s");
     }
-    
+
     @ApiOperation(value="SynchonizedN秒再返回结果")
     @ApiImplicitParam(name = "second", value = "等待时间(s)", required = true, dataType = "int", paramType = "path", defaultValue = "10")
     @RequestMapping(value = "/sync-lock/{second}", method = RequestMethod.GET)
