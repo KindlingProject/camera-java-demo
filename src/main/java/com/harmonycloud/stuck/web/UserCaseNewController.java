@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.harmonycloud.stuck.bean.BigResult;
 import com.harmonycloud.stuck.bean.Result;
+import com.harmonycloud.stuck.util.userCase.LogTestThreadTask;
 import com.harmonycloud.stuck.util.userCase.MyThreadTask;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -14,9 +15,10 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.BufferedInputStream;
-import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -67,40 +69,6 @@ public class UserCaseNewController {
         }
     }
 
-    @ApiOperation(value = "文件IO场景: 读文件加不加buffer")
-    @RequestMapping(value = "/buffer", method = RequestMethod.GET)
-    public Result buffer(@RequestParam String filePath,
-                         @RequestParam Boolean useBuffer) {
-        try {
-            if (useBuffer) {
-                log.info("加buffer读取文件");
-                BufferedInputStream inputStream = new BufferedInputStream(new FileInputStream(new File(filePath)));
-                byte[] bytes = new byte[1024];
-                int len = 0;
-                while ((len = inputStream.read(bytes)) != -1) {// 如果有数据就一直读写,否则就退出循环体,关闭流资源。
-                    new String(bytes, 0, len, "utf-8");
-                }
-                inputStream.close();
-            } else {
-                log.info("不加buffer读取文件");
-                FileInputStream inputStream2 = new FileInputStream(new File(filePath));
-                byte[] bytes2 = new byte[1024];
-                int len2 = 0;
-                while ((len2 = inputStream2.read(bytes2)) != -1) {
-                    new String(bytes2, 0, len2, "utf-8");
-                }
-                inputStream2.close();
-            }
-            log.info("读取文件结束");
-
-        } catch (Exception e) {
-            log.error("文件异常", e);
-            return Result.fail("error");
-        }
-        return Result.success("success");
-    }
-
-
     @ApiOperation(value = "线程并发场景：不同并发工作量(taskCount)下，是否用线程池两种场景性能比对")
     @RequestMapping(value = "/threadPoolTest", method = RequestMethod.GET)
     public Result threadPoolTest(@RequestParam Integer taskCount,
@@ -121,6 +89,75 @@ public class UserCaseNewController {
         Thread.sleep(500);
         return Result.success("success");
     }
+
+
+    @ApiOperation(value = "文件IO场景：加不加buffer性能对比")
+    @RequestMapping(value = "/fileIO", method = RequestMethod.GET)
+    public Result fileIO(@RequestParam Boolean useBuffer,
+                         @RequestParam String filePath) {
+        try {
+            String destPath = "dest.txt";
+            Files.deleteIfExists(Paths.get(destPath));
+            if (useBuffer) {
+                log.info("开始用buffer进行文件读取");
+                this.bufferOperationWith100Buffer(filePath);
+            } else {
+                log.info("开始不用buffer进行文件读取");
+                this.perByteOperation(filePath);
+            }
+            log.info("读取文件结束");
+            Thread.sleep(500);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return Result.success("success");
+    }
+
+
+    @ApiOperation(value = "多线程同步写日志：日志锁竞争")
+    @RequestMapping(value = "/logLock", method = RequestMethod.GET)
+    public Result logLock() {
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        log.info("启动线程池执行任务");
+        executorService.execute(new LogTestThreadTask());
+        executorService.shutdown();
+
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        return Result.success("success");
+    }
+
+
+    private void perByteOperation(String filePath) {
+        try (FileInputStream fileInputStream = new FileInputStream(filePath);
+             FileOutputStream fileOutputStream = new FileOutputStream("dest.txt")) {
+            int i;
+            while ((i = fileInputStream.read()) != -1) {
+                fileOutputStream.write(i);
+            }
+        } catch (Exception e) {
+            log.error("不用缓冲区读取文件异常", e);
+        }
+    }
+
+
+    private void bufferOperationWith100Buffer(String filePath) {
+        try (FileInputStream fileInputStream = new FileInputStream(filePath);
+             FileOutputStream fileOutputStream = new FileOutputStream("dest.txt")) {
+            byte[] buffer = new byte[100];
+            int len = 0;
+            while ((len = fileInputStream.read(buffer)) != -1) {
+                fileOutputStream.write(buffer, 0, len);
+            }
+        } catch (Exception e) {
+            log.error("用缓冲区读取文件异常", e);
+        }
+    }
+
 
 //    @ApiOperation(value = "线程start和run方法对比")
 //    @RequestMapping(value = "/threadInvokeTest", method = RequestMethod.GET)
