@@ -8,7 +8,7 @@ server:
 
 datasource:
   driverClass: com.mysql.cj.jdbc.Driver
-  url: jdbc:mysql://10.10.10.10:3306/test?characterEncoding=UTF-8&useSSL=false
+  url: jdbc:mysql://10.10.101.107:13306/test?characterEncoding=UTF-8&useSSL=false
   username: root
   password: root
   minPool: 2

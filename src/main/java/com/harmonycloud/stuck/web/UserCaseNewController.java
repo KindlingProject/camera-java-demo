@@ -7,18 +7,33 @@ import com.harmonycloud.stuck.bean.BigResult;
 import com.harmonycloud.stuck.bean.Result;
 import com.harmonycloud.stuck.util.userCase.LogTestThreadTask;
 import com.harmonycloud.stuck.util.userCase.MyThreadTask;
+import com.harmonycloud.stuck.util.userCase.UserService;
+import com.harmonycloud.stuck.util.userCase.UserService2;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.http.HttpStatus;
+import org.apache.http.ParseException;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.annotation.Resource;
+import javax.sql.DataSource;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,6 +45,16 @@ import java.util.concurrent.Executors;
 @RequestMapping("/UserCaseNew")
 @Slf4j
 public class UserCaseNewController {
+
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private UserService2 userService2;
+
+    @Autowired(required = false)
+    @Qualifier("HikariCP")
+    private DataSource hikariDataSource;
 
 
     @ApiOperation(value = "监测cpu-on事件能力：Jackson(jsonType=1)、fastjson(jsonType=2)、Gson(jsonType=3), net.sf.json(jsonType=4)三种序列化工具性能对比")
@@ -121,9 +146,11 @@ public class UserCaseNewController {
         ExecutorService executorService = Executors.newFixedThreadPool(2);
         log.info("启动线程池执行任务");
         executorService.execute(new LogTestThreadTask());
+        executorService.execute(new LogTestThreadTask());
         executorService.shutdown();
 
         try {
+
             Thread.sleep(500);
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -131,8 +158,60 @@ public class UserCaseNewController {
         return Result.success("success");
     }
 
+    @ApiOperation(value = "sql事务回滚-错误示范")
+    @RequestMapping(value = "/sqlBackError", method = RequestMethod.GET)
+    public Result sqlBackError(@RequestParam String name) {
+
+        try {
+            Connection connection = hikariDataSource.getConnection();
+            userService.createUserWrong1(connection, name);
+            Thread.sleep(550);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Result.success("success");
+    }
+
+    @ApiOperation(value = "sql事务回滚-正确示范")
+    @RequestMapping(value = "/sqlBackRight", method = RequestMethod.GET)
+    public Result sqlBackRight(@RequestParam String name) {
+
+        try {
+            Connection connection = hikariDataSource.getConnection();
+            userService2.createUserWrong1(connection, name);
+            Thread.sleep(550);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Result.success("success");
+    }
+
+
+    @ApiOperation(value = "DNS解析，调用域名接口")
+    @RequestMapping(value = "/dnsTest", method = RequestMethod.GET)
+    public Result dnsTest(@RequestParam("url") String url,
+                                @RequestParam(value = "param", defaultValue = "") String param) throws IOException {
+        log.info("Start to call another service:" + url + "?" + param);
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            if (!param.isEmpty()) {
+                url += "?"+param;
+            }
+            HttpGet httpGet = new HttpGet(url);
+            CloseableHttpResponse response = httpClient.execute(httpGet);
+            int code = response.getStatusLine().getStatusCode();
+            if(code == HttpStatus.SC_OK){
+                log.info("The result is：{}", EntityUtils.toString(response.getEntity()));
+            }
+        } catch (ParseException e) {
+            log.error("error", e);
+        }
+        log.info("End to call another service:" + url + "?" + param);
+        return Result.success("");
+    }
+
 
     private void perByteOperation(String filePath) {
+
         try (FileInputStream fileInputStream = new FileInputStream(filePath);
              FileOutputStream fileOutputStream = new FileOutputStream("dest.txt")) {
             int i;
@@ -142,6 +221,7 @@ public class UserCaseNewController {
         } catch (Exception e) {
             log.error("不用缓冲区读取文件异常", e);
         }
+
     }
 
 
