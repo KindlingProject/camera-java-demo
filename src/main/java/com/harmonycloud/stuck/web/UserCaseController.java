@@ -4,6 +4,7 @@ package com.harmonycloud.stuck.web;
 import com.google.common.cache.Cache;
 import com.harmonycloud.stuck.bean.Result;
 import com.harmonycloud.stuck.conf.CacheGuava;
+import com.harmonycloud.stuck.util.userCase.ServiceA;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
@@ -34,6 +35,8 @@ public class UserCaseController {
 
     @Resource
     private CacheGuava cacheGuava;
+    @Resource
+    private ServiceA serviceA;
 
     @ApiOperation(value = "concurrentHashMap线程安全性")
     @RequestMapping(value = "/currentHashMap", method = RequestMethod.GET)
@@ -94,6 +97,22 @@ public class UserCaseController {
         guavaChache.put("stock", 20);
         return Result.success("success");
     }
+
+
+    @RequestMapping(value = "/createManySpan", method = RequestMethod.GET)
+    public Result createManySpan() throws Exception {
+        Cache<String, Object> guavaChache = cacheGuava.getGuavaChache();
+        Integer stock = (Integer) guavaChache.get("stock", new Callable<Integer>() {
+            @Override
+            public Integer call() throws Exception {
+                return 1000;
+            }
+        });
+        serviceA.doSomethingA();
+        Thread.sleep(550);
+        return Result.success("success");
+    }
+
 
 
     @Data

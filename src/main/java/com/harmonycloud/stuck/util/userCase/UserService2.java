@@ -1,45 +1,38 @@
 package com.harmonycloud.stuck.util.userCase;
 
+import com.harmonycloud.stuck.bean.StudentDO;
+import com.harmonycloud.stuck.mapper.StudentMapper;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
+import javax.annotation.Resource;
 
 @Service
 public class UserService2 {
 
     private static Logger log = LogManager.getLogger(UserService2.class);
 
+    @Resource
+    private StudentMapper studentMapper;
+
+
+
+    public void createUserWrong1(String name) {
+        this.createUserPrivate(name);
+
+    }
 
     @Transactional(rollbackFor = Exception.class)
-    public void createUserWrong1(Connection conn, String name) throws Exception {
-        try {
-            this.createUserPrivate(name, conn);
-        } catch (Exception ex) {
-            log.error("create user failed because {}", ex.getMessage());
-            throw ex;
-        } finally {
-            if (conn != null) {
-                try {
-                    conn.close();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }
+    public void createUserPrivate(String name) {
+
+        StudentDO studentDO = new StudentDO();
+        studentDO.setName(name);
+        studentMapper.insert(studentDO);
+
+//        if (name.contains("test"))
+//            throw new RuntimeException("invalid username!");
     }
-
-
-    public void createUserPrivate(String name, Connection conn) throws Exception {
-
-        PreparedStatement pstmt = conn.prepareStatement("insert into test.student (id, name) values (null, 'test')");
-        pstmt.execute();
-        if (name.contains("test"))
-            throw new RuntimeException("invalid username!");
-    }
-
 
 }

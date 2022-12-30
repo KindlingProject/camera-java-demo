@@ -5,8 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.harmonycloud.stuck.bean.BigResult;
 import com.harmonycloud.stuck.bean.Result;
-import com.harmonycloud.stuck.util.userCase.LogTestThreadTask;
-import com.harmonycloud.stuck.util.userCase.MyThreadTask;
 import com.harmonycloud.stuck.util.userCase.UserService;
 import com.harmonycloud.stuck.util.userCase.UserService2;
 import io.swagger.annotations.Api;
@@ -19,26 +17,21 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.apache.skywalking.apm.toolkit.trace.Trace;
+import org.apache.skywalking.apm.toolkit.trace.TraceContext;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
-import javax.sql.DataSource;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Api(value = "userCase", tags = {"userCase-new"})
 @RestController
@@ -52,18 +45,21 @@ public class UserCaseNewController {
     @Autowired
     private UserService2 userService2;
 
-    @Autowired(required = false)
-    @Qualifier("HikariCP")
-    private DataSource hikariDataSource;
+//    @Autowired(required = false)
+//    @Qualifier("HikariCP")
+//    private DataSource hikariDataSource;
 
 
-    @ApiOperation(value = "监测cpu-on事件能力：Jackson(jsonType=1)、fastjson(jsonType=2)、Gson(jsonType=3), net.sf.json(jsonType=4)三种序列化工具性能对比")
+    @Trace
+    @ApiOperation(value = "监测cpu-on事件能力：fastjson(jsonType=1)、Jackson(jsonType=2)、Gson(jsonType=3), net.sf.json(jsonType=4)三种序列化工具性能对比")
     @RequestMapping(value = "/queryBigResult", method = RequestMethod.POST)
     public Result queryBigResult(@RequestParam Integer count,
                                  @RequestParam Integer jsonType) {
+//        log.info("skywalking的trace id = " + TraceContext.traceId());
 
         try {
             List<BigResult> list = new ArrayList<>();
+            log.info("开始构造大的序列化对象");
             for (int i = 0; i < count; i++) {
                 list.add(this.handleResult());
             }
@@ -72,57 +68,55 @@ public class UserCaseNewController {
                 Object r = JSONObject.toJSON(list);
                 log.info("序列化结束");
             } else if (2 == jsonType) {
-                log.info("开始执行fastJson序列化");
+                log.info("开始执行Jackson序列化");
                 ObjectMapper objectMapper = new ObjectMapper();
                 String r2 = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(list);
                 log.info("序列化结束");
             } else if (3 == jsonType) {
-                log.info("开始执行fastJson序列化");
+                log.info("开始执行Gson序列化");
                 Gson gson = new Gson();
                 Object r3 = gson.toJson(list);
                 log.info("序列化结束");
             } else {
-                log.info("开始执行fastJson序列化");
+                log.info("开始执行net.sf.json序列化");
                 net.sf.json.JSONArray r4 = net.sf.json.JSONArray.fromObject(list);
                 log.info("序列化结束");
             }
-            Thread.sleep(500);
-            return Result.success(list);
+            return Result.success("success");
         } catch (Exception e) {
             log.error("序列化测试异常，jsonType = " + jsonType, e);
             return Result.fail("error");
         }
     }
 
-    @ApiOperation(value = "线程并发场景：不同并发工作量(taskCount)下，是否用线程池两种场景性能比对")
-    @RequestMapping(value = "/threadPoolTest", method = RequestMethod.GET)
-    public Result threadPoolTest(@RequestParam Integer taskCount,
-                                 @RequestParam Integer poolSize) throws InterruptedException {
+    @Trace
+    @ApiOperation(value = "多线程并发，日志锁竞争")
+    @RequestMapping(value = "/logLock", method = RequestMethod.GET)
+    public Result threadPoolSingleTest (){
+        log.info("skywalking的trace id = " + TraceContext.traceId());
         long startTime = System.currentTimeMillis();
-
-        ExecutorService executorService = Executors.newFixedThreadPool(poolSize);
-        log.info("启动线程池执行任务");
-        for (int i = 0; i < taskCount; i++) {
-            executorService.execute(new MyThreadTask(startTime, 5));
+        for (int i = 0; i < 50; i++) {
+            log.info("线程" + Thread.currentThread().getName() + "开始执行工作");
+            for (int k = 0; k < 400; k++) {
+                Pattern pattern = Pattern.compile("^[1-9]\\d{5}[1-9]\\d{3}((0\\d)|(1[0-2]))(([0|1|2]\\d)|3[0-1])\\d{4}$");
+                Matcher m = pattern.matcher("430923199803084155");
+            }
+            log.info("线程" + Thread.currentThread().getName() + "本次执行任务耗时 = " + (System.currentTimeMillis() - startTime));
         }
-        executorService.shutdown();
 
-        log.info("不用线程池，创建单个线程执行任务");
-        for (int k = 0; k < taskCount; k++) {
-            new Thread(new MyThreadTask(startTime, 5)).start();
-        }
-        Thread.sleep(500);
-        return Result.success("success");
+        return Result.success(TraceContext.traceId());
     }
 
 
+    @Trace
     @ApiOperation(value = "文件IO场景：加不加buffer性能对比")
     @RequestMapping(value = "/fileIO", method = RequestMethod.GET)
     public Result fileIO(@RequestParam Boolean useBuffer,
                          @RequestParam String filePath) {
+        log.info("skywalking的trace id = " + TraceContext.traceId());
         try {
-            String destPath = "dest.txt";
-            Files.deleteIfExists(Paths.get(destPath));
+//            String destPath = "dest.txt";
+//            Files.deleteIfExists(Paths.get(destPath));
             if (useBuffer) {
                 log.info("开始用buffer进行文件读取");
                 this.bufferOperationWith100Buffer(filePath);
@@ -131,7 +125,6 @@ public class UserCaseNewController {
                 this.perByteOperation(filePath);
             }
             log.info("读取文件结束");
-            Thread.sleep(500);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -139,47 +132,33 @@ public class UserCaseNewController {
         return Result.success("success");
     }
 
-
-    @ApiOperation(value = "多线程同步写日志：日志锁竞争")
-    @RequestMapping(value = "/logLock", method = RequestMethod.GET)
-    public Result logLock() {
-        ExecutorService executorService = Executors.newFixedThreadPool(2);
-        log.info("启动线程池执行任务");
-        executorService.execute(new LogTestThreadTask());
-        executorService.execute(new LogTestThreadTask());
-        executorService.shutdown();
-
-        try {
-
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        return Result.success("success");
-    }
-
+    @Trace
     @ApiOperation(value = "sql事务回滚-错误示范")
     @RequestMapping(value = "/sqlBackError", method = RequestMethod.GET)
-    public Result sqlBackError(@RequestParam String name) {
-
+    public Result sqlBackError(@RequestParam String name) throws InterruptedException {
+        log.info("skywalking的trace id = " + TraceContext.traceId());
         try {
-            Connection connection = hikariDataSource.getConnection();
-            userService.createUserWrong1(connection, name);
-            Thread.sleep(550);
+            try {
+                userService.createUserWrong1(name);
+            } catch (Exception e) {
+
+            }
+            userService2.createUserWrong1(name);
         } catch (Exception e) {
             e.printStackTrace();
         }
         return Result.success("success");
     }
 
+    @Trace
     @ApiOperation(value = "sql事务回滚-正确示范")
     @RequestMapping(value = "/sqlBackRight", method = RequestMethod.GET)
-    public Result sqlBackRight(@RequestParam String name) {
+    public Result sqlBackRight(@RequestParam String name) throws InterruptedException {
 
+//        log.info("skywalking的trace id = " + TraceContext.traceId());
         try {
-            Connection connection = hikariDataSource.getConnection();
-            userService2.createUserWrong1(connection, name);
-            Thread.sleep(550);
+            userService2.createUserWrong1(name);
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -187,19 +166,21 @@ public class UserCaseNewController {
     }
 
 
+    @Trace
     @ApiOperation(value = "DNS解析，调用域名接口")
     @RequestMapping(value = "/dnsTest", method = RequestMethod.GET)
     public Result dnsTest(@RequestParam("url") String url,
-                                @RequestParam(value = "param", defaultValue = "") String param) throws IOException {
+                          @RequestParam(value = "param", defaultValue = "") String param) throws IOException {
         log.info("Start to call another service:" + url + "?" + param);
+//        log.info("skywalking的trace id = " + TraceContext.traceId());
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             if (!param.isEmpty()) {
-                url += "?"+param;
+                url += "?" + param;
             }
             HttpGet httpGet = new HttpGet(url);
             CloseableHttpResponse response = httpClient.execute(httpGet);
             int code = response.getStatusLine().getStatusCode();
-            if(code == HttpStatus.SC_OK){
+            if (code == HttpStatus.SC_OK) {
                 log.info("The result is：{}", EntityUtils.toString(response.getEntity()));
             }
         } catch (ParseException e) {
@@ -210,13 +191,15 @@ public class UserCaseNewController {
     }
 
 
+    /**
+     * 不用缓冲取读取文件
+     * @param filePath
+     */
     private void perByteOperation(String filePath) {
 
         try (FileInputStream fileInputStream = new FileInputStream(filePath);
-             FileOutputStream fileOutputStream = new FileOutputStream("dest.txt")) {
-            int i;
-            while ((i = fileInputStream.read()) != -1) {
-                fileOutputStream.write(i);
+        ) {
+            while ((fileInputStream.read()) != -1) {
             }
         } catch (Exception e) {
             log.error("不用缓冲区读取文件异常", e);
@@ -225,55 +208,23 @@ public class UserCaseNewController {
     }
 
 
+    /**
+     * 用缓冲区读取文件
+     *
+     * @param filePath
+     */
     private void bufferOperationWith100Buffer(String filePath) {
         try (FileInputStream fileInputStream = new FileInputStream(filePath);
-             FileOutputStream fileOutputStream = new FileOutputStream("dest.txt")) {
+        ) {
             byte[] buffer = new byte[100];
-            int len = 0;
-            while ((len = fileInputStream.read(buffer)) != -1) {
-                fileOutputStream.write(buffer, 0, len);
+            while ((fileInputStream.read(buffer)) != -1) {
+//
             }
         } catch (Exception e) {
             log.error("用缓冲区读取文件异常", e);
         }
     }
 
-
-//    @ApiOperation(value = "线程start和run方法对比")
-//    @RequestMapping(value = "/threadInvokeTest", method = RequestMethod.GET)
-//    public Result threadInvokeTest() throws InterruptedException {
-//
-//        log.info("Thread.start启动");
-//        new Thread(new MyThreadTask(System.currentTimeMillis(), 50)).start();
-//
-//        log.info("Thread.run启动");
-//        new Thread(new MyThreadTask(System.currentTimeMillis(), 50)).run();
-//
-//        log.info("请求执行结束");
-//        Thread.sleep(510);
-//        return Result.success("success");
-//    }
-
-//    @ApiOperation(value = "多线程下，finnaly的执行")
-//    @RequestMapping(value = "/forkJoin/{endCount}", method = RequestMethod.GET)
-//    public Result forkJoin(@PathVariable("endCount") int endCount) {
-//
-//        try {
-//            log.info("开始执行请求, start time={}", System.currentTimeMillis());
-//            ForkJoinPool forkjoinPool = new ForkJoinPool();
-//            ForkJoinTask task = new ForkJoinTask(1, endCount);
-//            forkjoinPool.submit(task);
-//            log.info("请求执行结束, end time={}", System.currentTimeMillis());
-//
-//            forkjoinPool.shutdown();
-//            return Result.success("Success, result= ");
-//        } catch (Exception e) {
-//            return Result.fail("计算失败" + e);
-//        } finally {
-//            log.info("我是finally的内容");
-//        }
-//
-//    }
 
 
     private BigResult handleResult() {

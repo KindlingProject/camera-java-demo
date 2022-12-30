@@ -71,7 +71,7 @@ public class WaitController {
     @ApiOperation(value="请求另一个服务，返回结果")
     @RequestMapping(value = "/callOthers", method = RequestMethod.GET)
     public Result RequestOthers(@RequestParam("url") String url,
-                                @RequestParam(value = "param", defaultValue = "") String param) throws IOException {
+                                @RequestParam(value = "param", defaultValue = "") String param) throws IOException, InterruptedException {
         LOG.info("Start to call another service:" + url + "?" + param);
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             if (!param.isEmpty()) {
@@ -83,10 +83,11 @@ public class WaitController {
             if(code == HttpStatus.SC_OK){
                 LOG.info("The result is：{}", EntityUtils.toString(response.getEntity()));
             }
-        } catch (ParseException e) {
+        } catch (Exception e) {
             LOG.error(e);
         }
         LOG.info("End to call another service:" + url + "?" + param);
+        Thread.sleep(550);
         return Result.success("");
     }
 }

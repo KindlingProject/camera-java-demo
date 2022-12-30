@@ -20,11 +20,11 @@ public class MyThreadTask implements Runnable {
     @Override
     public void run() {
         try {
-            log.info("线程" + Thread.currentThread().getName() + "开始执行工作");
+//            log.info("线程" + Thread.currentThread().getName() + "开始执行工作");
             Thread.sleep(sleepTime);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        log.info("线程" + Thread.currentThread().getName() + "执行任务已耗时 = " + (System.currentTimeMillis() - startTime));
+//        log.info("线程" + Thread.currentThread().getName() + "执行任务已耗时 = " + (System.currentTimeMillis() - startTime));
     }
 }
