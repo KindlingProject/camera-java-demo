@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.harmonycloud.stuck.bean.BigResult;
 import com.harmonycloud.stuck.bean.Result;
-import com.harmonycloud.stuck.util.userCase.UserService;
-import com.harmonycloud.stuck.util.userCase.UserService2;
+import com.harmonycloud.stuck.util.userCase.UserWrongService;
+import com.harmonycloud.stuck.util.userCase.UserRightService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -20,13 +20,13 @@ import org.apache.http.util.EntityUtils;
 import org.apache.skywalking.apm.toolkit.trace.Trace;
 import org.apache.skywalking.apm.toolkit.trace.TraceContext;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,14 +40,10 @@ import java.util.regex.Pattern;
 public class UserCaseNewController {
 
     @Autowired
-    private UserService userService;
+    private UserWrongService userService;
 
     @Autowired
-    private UserService2 userService2;
-
-//    @Autowired(required = false)
-//    @Qualifier("HikariCP")
-//    private DataSource hikariDataSource;
+    private UserRightService userService2;
 
 
     @Trace
@@ -55,7 +51,7 @@ public class UserCaseNewController {
     @RequestMapping(value = "/queryBigResult", method = RequestMethod.POST)
     public Result queryBigResult(@RequestParam Integer count,
                                  @RequestParam Integer jsonType) {
-//        log.info("skywalking的trace id = " + TraceContext.traceId());
+        log.info("skywalking的trace id = " + TraceContext.traceId());
 
         try {
             List<BigResult> list = new ArrayList<>();
@@ -90,9 +86,9 @@ public class UserCaseNewController {
     }
 
     @Trace
-    @ApiOperation(value = "多线程并发，日志锁竞争")
+    @ApiOperation(value = "并发场景：多线程，日志锁竞争")
     @RequestMapping(value = "/logLock", method = RequestMethod.GET)
-    public Result threadPoolSingleTest (){
+    public Result threadPoolSingleTest() {
         log.info("skywalking的trace id = " + TraceContext.traceId());
         long startTime = System.currentTimeMillis();
         for (int i = 0; i < 50; i++) {
@@ -115,8 +111,6 @@ public class UserCaseNewController {
                          @RequestParam String filePath) {
         log.info("skywalking的trace id = " + TraceContext.traceId());
         try {
-//            String destPath = "dest.txt";
-//            Files.deleteIfExists(Paths.get(destPath));
             if (useBuffer) {
                 log.info("开始用buffer进行文件读取");
                 this.bufferOperationWith100Buffer(filePath);
@@ -135,33 +129,24 @@ public class UserCaseNewController {
     @Trace
     @ApiOperation(value = "sql事务回滚-错误示范")
     @RequestMapping(value = "/sqlBackError", method = RequestMethod.GET)
-    public Result sqlBackError(@RequestParam String name) throws InterruptedException {
+    public Result sqlBackError(@RequestParam String name) {
         log.info("skywalking的trace id = " + TraceContext.traceId());
-        try {
-            try {
-                userService.createUserWrong1(name);
-            } catch (Exception e) {
 
-            }
-            userService2.createUserWrong1(name);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        userService.createUserWrong(name);
+
         return Result.success("success");
     }
 
     @Trace
     @ApiOperation(value = "sql事务回滚-正确示范")
     @RequestMapping(value = "/sqlBackRight", method = RequestMethod.GET)
-    public Result sqlBackRight(@RequestParam String name) throws InterruptedException {
+    public Result sqlBackRight(@RequestParam String name) {
 
-//        log.info("skywalking的trace id = " + TraceContext.traceId());
-        try {
-            userService2.createUserWrong1(name);
+        log.info("skywalking的trace id = " + TraceContext.traceId());
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        userService2.createUserWrong(name);
+
+
         return Result.success("success");
     }
 
@@ -172,7 +157,7 @@ public class UserCaseNewController {
     public Result dnsTest(@RequestParam("url") String url,
                           @RequestParam(value = "param", defaultValue = "") String param) throws IOException {
         log.info("Start to call another service:" + url + "?" + param);
-//        log.info("skywalking的trace id = " + TraceContext.traceId());
+        log.info("skywalking的trace id = " + TraceContext.traceId());
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             if (!param.isEmpty()) {
                 url += "?" + param;
@@ -193,6 +178,7 @@ public class UserCaseNewController {
 
     /**
      * 不用缓冲取读取文件
+     *
      * @param filePath
      */
     private void perByteOperation(String filePath) {
@@ -224,7 +210,6 @@ public class UserCaseNewController {
             log.error("用缓冲区读取文件异常", e);
         }
     }
-
 
 
     private BigResult handleResult() {
