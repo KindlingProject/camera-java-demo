@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.harmonycloud.stuck.bean.BigResult;
 import com.harmonycloud.stuck.bean.Result;
-import com.harmonycloud.stuck.util.userCase.UserWrongService;
 import com.harmonycloud.stuck.util.userCase.UserRightService;
+import com.harmonycloud.stuck.util.userCase.UserWrongService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -20,13 +20,19 @@ import org.apache.http.util.EntityUtils;
 import org.apache.skywalking.apm.toolkit.trace.Trace;
 import org.apache.skywalking.apm.toolkit.trace.TraceContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 
+import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,8 +56,7 @@ public class UserCaseNewController {
     @ApiOperation(value = "监测cpu-on事件能力：fastjson(jsonType=1)、Jackson(jsonType=2)、Gson(jsonType=3), net.sf.json(jsonType=4)三种序列化工具性能对比")
     @RequestMapping(value = "/queryBigResult", method = RequestMethod.POST)
     public Result queryBigResult(@RequestParam Integer count,
-                                 @RequestParam Integer jsonType) {
-        log.info("skywalking的trace id = " + TraceContext.traceId());
+                                 @RequestParam Integer jsonType, HttpServletResponse response) throws IOException {
 
         try {
             List<BigResult> list = new ArrayList<>();
@@ -63,22 +68,26 @@ public class UserCaseNewController {
                 log.info("开始执行fastJson序列化");
                 Object r = JSONObject.toJSON(list);
                 log.info("序列化结束");
+                return Result.success(r);
             } else if (2 == jsonType) {
                 log.info("开始执行Jackson序列化");
                 ObjectMapper objectMapper = new ObjectMapper();
                 String r2 = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(list);
                 log.info("序列化结束");
+                return Result.success(r2);
             } else if (3 == jsonType) {
                 log.info("开始执行Gson序列化");
                 Gson gson = new Gson();
                 Object r3 = gson.toJson(list);
                 log.info("序列化结束");
+                return Result.success(r3);
             } else {
                 log.info("开始执行net.sf.json序列化");
                 net.sf.json.JSONArray r4 = net.sf.json.JSONArray.fromObject(list);
                 log.info("序列化结束");
+                return Result.success(r4);
             }
-            return Result.success("success");
+//            return Result.success("success");
         } catch (Exception e) {
             log.error("序列化测试异常，jsonType = " + jsonType, e);
             return Result.fail("error");
@@ -89,7 +98,6 @@ public class UserCaseNewController {
     @ApiOperation(value = "并发场景：多线程，日志锁竞争")
     @RequestMapping(value = "/logLock", method = RequestMethod.GET)
     public Result threadPoolSingleTest() {
-        log.info("skywalking的trace id = " + TraceContext.traceId());
         long startTime = System.currentTimeMillis();
         for (int i = 0; i < 50; i++) {
             log.info("线程" + Thread.currentThread().getName() + "开始执行工作");
@@ -109,7 +117,6 @@ public class UserCaseNewController {
     @RequestMapping(value = "/fileIO", method = RequestMethod.GET)
     public Result fileIO(@RequestParam Boolean useBuffer,
                          @RequestParam String filePath) {
-        log.info("skywalking的trace id = " + TraceContext.traceId());
         try {
             if (useBuffer) {
                 log.info("开始用buffer进行文件读取");
@@ -130,7 +137,6 @@ public class UserCaseNewController {
     @ApiOperation(value = "sql事务回滚-错误示范")
     @RequestMapping(value = "/sqlBackError", method = RequestMethod.GET)
     public Result sqlBackError(@RequestParam String name) {
-        log.info("skywalking的trace id = " + TraceContext.traceId());
 
         userService.createUserWrong(name);
 
@@ -142,7 +148,6 @@ public class UserCaseNewController {
     @RequestMapping(value = "/sqlBackRight", method = RequestMethod.GET)
     public Result sqlBackRight(@RequestParam String name) {
 
-        log.info("skywalking的trace id = " + TraceContext.traceId());
 
         userService2.createUserWrong(name);
 
