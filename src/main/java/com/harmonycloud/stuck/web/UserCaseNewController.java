@@ -54,6 +54,25 @@ public class UserCaseNewController {
 
 
     @Trace
+    @ApiOperation(value = "多次正则校验")
+    @RequestMapping(value = "/pattern/test", method = RequestMethod.GET)
+    public Result patternTest(@RequestParam Integer count) {
+
+        try {
+
+
+            for (int k = 0; k < count; k++) {
+                m = pattern.matcher("430923199803084155");
+            }
+
+        } catch (Exception e) {
+            log.error("计算失败", e);
+
+        }
+        return Result.success("success");
+    }
+
+    @Trace
     @ApiOperation(value = "监测cpu-on事件能力：fastjson(jsonType=1)、Jackson(jsonType=2)、Gson(jsonType=3), net.sf.json(jsonType=4)三种序列化工具性能对比")
     @RequestMapping(value = "/queryBigResult", method = RequestMethod.POST)
     public Result queryBigResult(@RequestParam Integer count,
@@ -115,24 +134,7 @@ public class UserCaseNewController {
     }
 
 
-    @Trace
-    @ApiOperation(value = "多次正则校验")
-    @RequestMapping(value = "/pattern/test", method = RequestMethod.GET)
-    public Result patternTest(@RequestParam Integer count) {
 
-        try {
-
-
-            for (int k = 0; k < count; k++) {
-                m = pattern.matcher("430923199803084155");
-            }
-
-        } catch (Exception e) {
-            log.error("计算失败", e);
-
-        }
-        return Result.success("success");
-    }
 
 
     @Trace
