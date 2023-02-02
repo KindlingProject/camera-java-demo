@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.harmonycloud.stuck.bean.BigResult;
 import com.harmonycloud.stuck.bean.Result;
+import com.harmonycloud.stuck.util.userCase.MyThreadTask;
 import com.harmonycloud.stuck.util.userCase.UserRightService;
 import com.harmonycloud.stuck.util.userCase.UserWrongService;
 import io.swagger.annotations.Api;
@@ -20,19 +21,16 @@ import org.apache.http.util.EntityUtils;
 import org.apache.skywalking.apm.toolkit.trace.Trace;
 import org.apache.skywalking.apm.toolkit.trace.TraceContext;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestTemplate;
 
 import javax.servlet.http.HttpServletResponse;
-import java.io.BufferedReader;
+import java.io.BufferedInputStream;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -51,6 +49,9 @@ public class UserCaseNewController {
     @Autowired
     private UserRightService userService2;
 
+    public static Pattern pattern = Pattern.compile("^[1-9]\\d{5}[1-9]\\d{3}((0\\d)|(1[0-2]))(([0|1|2]\\d)|3[0-1])\\d{4}$");
+    public static Matcher m;
+
 
     @Trace
     @ApiOperation(value = "监测cpu-on事件能力：fastjson(jsonType=1)、Jackson(jsonType=2)、Gson(jsonType=3), net.sf.json(jsonType=4)三种序列化工具性能对比")
@@ -59,6 +60,8 @@ public class UserCaseNewController {
                                  @RequestParam Integer jsonType, HttpServletResponse response) throws IOException {
 
         try {
+
+            long startTime = System.currentTimeMillis();
             List<BigResult> list = new ArrayList<>();
             log.info("开始构造大的序列化对象");
             for (int i = 0; i < count; i++) {
@@ -68,26 +71,26 @@ public class UserCaseNewController {
                 log.info("开始执行fastJson序列化");
                 Object r = JSONObject.toJSON(list);
                 log.info("序列化结束");
-                return Result.success(r);
+//                return Result.success(r);
             } else if (2 == jsonType) {
                 log.info("开始执行Jackson序列化");
                 ObjectMapper objectMapper = new ObjectMapper();
                 String r2 = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(list);
-                log.info("序列化结束");
+                log.info("序列化结束,耗时{}=", System.currentTimeMillis() - startTime);
                 return Result.success(r2);
             } else if (3 == jsonType) {
                 log.info("开始执行Gson序列化");
                 Gson gson = new Gson();
                 Object r3 = gson.toJson(list);
                 log.info("序列化结束");
-                return Result.success(r3);
+//                return Result.success(r3);
             } else {
                 log.info("开始执行net.sf.json序列化");
                 net.sf.json.JSONArray r4 = net.sf.json.JSONArray.fromObject(list);
                 log.info("序列化结束");
-                return Result.success(r4);
+//                return Result.success(r4);
             }
-//            return Result.success("success");
+            return Result.success("success");
         } catch (Exception e) {
             log.error("序列化测试异常，jsonType = " + jsonType, e);
             return Result.fail("error");
@@ -113,19 +116,71 @@ public class UserCaseNewController {
 
 
     @Trace
+    @ApiOperation(value = "多次正则校验")
+    @RequestMapping(value = "/pattern/test", method = RequestMethod.GET)
+    public Result patternTest(@RequestParam Integer count) {
+
+        try {
+
+
+            for (int k = 0; k < count; k++) {
+                m = pattern.matcher("430923199803084155");
+            }
+
+        } catch (Exception e) {
+            log.error("计算失败", e);
+
+        }
+        return Result.success("success");
+    }
+
+
+    @Trace
     @ApiOperation(value = "文件IO场景：加不加buffer性能对比")
     @RequestMapping(value = "/fileIO", method = RequestMethod.GET)
     public Result fileIO(@RequestParam Boolean useBuffer,
                          @RequestParam String filePath) {
         try {
             if (useBuffer) {
-                log.info("开始用buffer进行文件读取");
                 this.bufferOperationWith100Buffer(filePath);
             } else {
-                log.info("开始不用buffer进行文件读取");
                 this.perByteOperation(filePath);
             }
-            log.info("读取文件结束");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return Result.success("success");
+    }
+
+
+    @Trace
+    @ApiOperation(value = "文件IO场景：并发写同一份文件")
+    @RequestMapping(value = "/fileWrite", method = RequestMethod.GET)
+    public Result fileWrite(@RequestParam String filePath) {
+        try {
+            FileWriter writer = new FileWriter(filePath);
+            writer.write("Hello, world!");
+            writer.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return Result.success("success");
+    }
+
+    @Trace
+    @ApiOperation(value = "文件IO场景：多线程并行加buffer读取文件")
+    @RequestMapping(value = "/thread/fileIO", method = RequestMethod.GET)
+    public Result threadFileIO(@RequestParam Integer count,
+                               @RequestParam String filePath) {
+        try {
+
+            for (int i = 0; i < count; i++) {
+                Thread thread = new Thread(new MyThreadTask(filePath));
+                thread.start();
+            }
+            Thread.sleep(200);
         } catch (Exception e) {
             e.printStackTrace();
         }
