@@ -45,7 +45,7 @@ public class CpuController {
 
     @ApiOperation(value = "多函数计算型任务")
     @RequestMapping(value = "/flameGraph", method = RequestMethod.GET)
-    public String flameGraph(@RequestParam(value = "maxNumber", defaultValue = "1e8") long maxNumber) {
+    public String flameGraph(@RequestParam(value = "maxNumber", defaultValue = "100000000") long maxNumber) {
         long startTime = System.nanoTime();
         long a = 2, b = 1;
         while (a < maxNumber) {

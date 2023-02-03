@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.Semaphore;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -171,24 +172,24 @@ public class UserCaseNewController {
         return Result.success("success");
     }
 
-    @Trace
-    @ApiOperation(value = "文件IO场景：多线程并行加buffer读取文件")
-    @RequestMapping(value = "/thread/fileIO", method = RequestMethod.GET)
-    public Result threadFileIO(@RequestParam Integer count,
-                               @RequestParam String filePath) {
-        try {
-
-            for (int i = 0; i < count; i++) {
-                Thread thread = new Thread(new MyThreadTask(filePath));
-                thread.start();
-            }
-            Thread.sleep(200);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return Result.success("success");
-    }
+//    @Trace
+//    @ApiOperation(value = "文件IO场景：多线程并行加buffer读取文件")
+//    @RequestMapping(value = "/thread/fileIO", method = RequestMethod.GET)
+//    public Result threadFileIO(@RequestParam Integer count,
+//                               @RequestParam String filePath) {
+//        try {
+//
+//            for (int i = 0; i < count; i++) {
+//                Thread thread = new Thread(new MyThreadTask(filePath));
+//                thread.start();
+//            }
+//            Thread.sleep(200);
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//
+//        return Result.success("success");
+//    }
 
     @Trace
     @ApiOperation(value = "sql事务回滚-错误示范")
@@ -322,4 +323,109 @@ public class UserCaseNewController {
     }
 
 
+    public StopCondition RunQueueThreadCondition = new StopCondition(false);
+    @Trace
+    @ApiOperation(value = "同时唤醒若干线程，使run queue变长")
+    @RequestMapping(value = "/startRunqlatency", method = RequestMethod.GET)
+    public Result startRunQueueThread(@RequestParam("threadNum") int num) throws InterruptedException {
+        RunQueueThreadCondition.setStopped(false);
+        Thread startThreadLoop = new Thread(new LoopThread(RunQueueThreadCondition, num),"ThreadWakeLoop");
+        startThreadLoop.start();
+        return Result.success("Runqlatency threads started");
+    }
+
+    @Trace
+    @ApiOperation(value = "停止唤醒若干线程，使run queue恢复正常")
+    @RequestMapping(value = "/stopRunqlatency", method = RequestMethod.GET)
+    public Result stopRunQueueThread() throws InterruptedException {
+        if (RunQueueThreadCondition.stopped) {
+            return Result.success("Runqlatency threads are not started");
+        }
+        RunQueueThreadCondition.setStopped(true);
+        return Result.success("Runqlatency threads have been stopped");
+    }
+
+
+    class WaitThread implements Runnable {
+        Semaphore semaphore;
+        WaitThread(Semaphore semaphore) {
+            this.semaphore = semaphore;
+        }
+
+        @Override
+        public void run() {
+            while (!RunQueueThreadCondition.stopped) {
+                try {
+                    semaphore.acquire();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                long a = 2, b = 1;
+                while (a < 50000) {
+                    a++;
+                    b++;
+                    a = divide(a, b);
+                    a = add(a, b);
+                }
+            }
+        }
+
+        public long divide(long a, long b) {
+            if (b == 0) {
+                return a;
+            }
+            return a / b;
+        }
+
+        public long add(long a, long b) {
+            return a + b;
+        }
+    }
+
+    class LoopThread implements Runnable {
+        StopCondition condition;
+        Semaphore semaphore;
+        int num;
+        LoopThread(StopCondition condition, int num) {
+            this.condition = condition;
+            this.num = num;
+            semaphore = new Semaphore(num);
+        }
+        @Override
+        public void run() {
+            try {
+                startThreads();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            while (!condition.stopped) {
+                releaseAllSemaphore();
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+        public void startThreads() throws InterruptedException {
+            semaphore.acquire(num);
+            for (int i=0; i < num; i++) {
+                Thread thread = new Thread(new WaitThread(semaphore), "thread-" + i);
+                thread.start();
+            }
+        }
+        public void releaseAllSemaphore() {
+            semaphore.release(num);
+        }
+    }
+}
+
+class StopCondition {
+    boolean stopped;
+    StopCondition(boolean stopped) {
+        this.stopped = stopped;
+    }
+    public void setStopped(boolean stopped) {
+        this.stopped = stopped;
+    }
 }
