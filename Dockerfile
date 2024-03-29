@@ -1,5 +1,5 @@
-FROM java
+FROM apache/skywalking-java-agent:8.5.0-jdk8
 WORKDIR /workspace
-ENV JAVA_OPTS=""
-ADD springboot-stuck-demo-1.0.jar /workspace/springboot-stuck-demo-1.0.jar
-ENTRYPOINT [ "sh", "-c", "java $JAVA_OPTS -jar /workspace/springboot-stuck-demo-1.0.jar" ]
+ADD target/demo2.jar /workspace/demo2.jar
+ENTRYPOINT [ "sh", "-c", "java -jar /workspace/demo2.jar" ]
+

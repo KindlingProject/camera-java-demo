@@ -1,20 +1,10 @@
 server:
   port: 8080
-  undertow:
-    io-threads: 4
-    worker-threads: 3
-  tomcat:
-    max-threads: 3
-
-#datasource:
-#  driverClass: com.mysql.cj.jdbc.Driver
-#  url: jdbc:mysql://10.10.101.107:13306/test?characterEncoding=UTF-8&useSSL=false
-#  username: root
-#  password: root
-#  minPool: 2
-#  maxPool: 2
-#  # 获取连接超时时间，单位(ms)
-#  connection-timeout: 5000
+#  undertow:
+#    io-threads: 4
+#    worker-threads: 3
+#  tomcat:
+#    max-threads: 3
 
 spring:
   datasource:
